@@ -93,6 +93,16 @@ function SwipeableCard({
   }, [complaint.id, x]);
 
   useEffect(() => {
+    if (!isTopCard || isSwipeLocked) return;
+    const controls = animate(x, [0, -10, 10, 0], {
+      delay: 0.5,
+      duration: 0.6,
+      ease: "easeInOut",
+    });
+    return () => controls.stop();
+  }, [isTopCard, complaint.id, isSwipeLocked, x]);
+
+  useEffect(() => {
     if (!commitStamp) return;
     const target = commitStamp === "upvote" ? 500 : -500;
     const controls = animate(x, target, { type: "tween", duration: 0.28, ease: "easeOut" });
@@ -144,8 +154,20 @@ function SwipeableCard({
         backgroundColor: STICKY_NOTE_COLOR,
         zIndex: stackIndex + 1,
       }}
-      className={`touch-none absolute inset-x-0 mx-auto flex w-full max-w-md flex-col gap-5 rounded-[255px_15px_225px_15px/15px_225px_15px_255px] border-2 border-black p-5 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] ${CARD_ROTATIONS[stackIndex % CARD_ROTATIONS.length]} ${isTopCard && !isSwipeLocked ? "cursor-grab" : ""}`}
+      className={`absolute inset-x-0 mx-auto flex w-full max-w-md flex-col rounded-[255px_15px_225px_15px/15px_225px_15px_255px] border-2 border-black p-5 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] ${CARD_ROTATIONS[stackIndex % CARD_ROTATIONS.length]} ${isTopCard && !isSwipeLocked ? "cursor-grab" : ""}`}
     >
+      <motion.div
+        className="relative flex min-h-0 w-full flex-col gap-5"
+        initial={false}
+        animate={
+          isTopCard && !isSwipeLocked ? { rotate: [0, -3, 3, 0] } : { rotate: 0 }
+        }
+        transition={
+          isTopCard && !isSwipeLocked
+            ? { delay: 0.5, duration: 0.6, ease: "easeInOut" }
+            : { duration: 0 }
+        }
+      >
       {commitStamp ? (
         <div
           className={`font-typewriter pointer-events-none absolute right-4 top-4 rotate-12 rounded-full border-[3px] px-3 py-1 text-sm font-semibold uppercase tracking-widest shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] ${
@@ -208,6 +230,7 @@ function SwipeableCard({
           💬 Comments
         </button>
       </div>
+      </motion.div>
     </motion.div>
   );
 }
@@ -232,6 +255,7 @@ export function StudentView() {
   const [isPostingComment, setIsPostingComment] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [hasSwiped, setHasSwiped] = useState(false);
 
   useEffect(() => {
     async function fetchPendingComplaints() {
@@ -260,6 +284,7 @@ export function StudentView() {
 
   async function handleCardSwipe(cardId: number, voteType: "upvote" | "downvote") {
     if (activeSwipeId !== null) return;
+    setHasSwiped(true);
     setActiveSwipeId(cardId);
     setErrorMessage("");
     setStampVote({ complaintId: cardId, type: voteType });
@@ -403,42 +428,56 @@ export function StudentView() {
 
   return (
     <div
-      className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden bg-[#faf8f5] px-4 py-8 sm:py-12"
+      className="relative flex min-h-0 flex-1 flex-col items-center justify-center bg-[#faf8f5] px-4 py-8 sm:py-12"
       style={PAPER_TEXTURE_STYLE}
     >
-      <div className="relative w-full max-w-md pb-24" style={{ minHeight: "26rem" }}>
+      <div className="relative w-full max-w-md pb-24">
         {isLoadingCards ? (
-          <p className="font-typewriter text-center text-base text-neutral-700">
-            Loading complaints...
-          </p>
+          <div style={{ minHeight: "26rem" }}>
+            <p className="font-typewriter text-center text-base text-neutral-700">
+              Loading complaints...
+            </p>
+          </div>
         ) : pendingComplaints.length === 0 ? (
-          <p className="font-typewriter text-center text-base text-neutral-700">
-            No pending complaints.
-          </p>
+          <div style={{ minHeight: "26rem" }}>
+            <p className="font-typewriter text-center text-base text-neutral-700">
+              No pending complaints.
+            </p>
+          </div>
         ) : (
-          <AnimatePresence>
-            {pendingComplaints.map((card, stackIndex) => {
-              const isTopCard = stackIndex === pendingComplaints.length - 1;
-              const commitStamp =
-                stampVote && stampVote.complaintId === card.id ? stampVote.type : null;
+          <div
+            className="relative w-full touch-none"
+            style={{ minHeight: "26rem" }}
+          >
+            <AnimatePresence>
+              {pendingComplaints.map((card, stackIndex) => {
+                const isTopCard = stackIndex === pendingComplaints.length - 1;
+                const commitStamp =
+                  stampVote && stampVote.complaintId === card.id ? stampVote.type : null;
 
-              return (
-                <SwipeableCard
-                  key={card.id}
-                  complaint={card}
-                  stackIndex={stackIndex}
-                  stackSize={stackSize}
-                  isTopCard={isTopCard}
-                  isSwipeLocked={isSwipeLocked}
-                  commitStamp={commitStamp}
-                  onSwipeRight={() => void handleCardSwipe(card.id, "upvote")}
-                  onSwipeLeft={() => void handleCardSwipe(card.id, "downvote")}
-                  onCommentsClick={() => void openCommentsModal(card)}
-                />
-              );
-            })}
-          </AnimatePresence>
+                return (
+                  <SwipeableCard
+                    key={card.id}
+                    complaint={card}
+                    stackIndex={stackIndex}
+                    stackSize={stackSize}
+                    isTopCard={isTopCard}
+                    isSwipeLocked={isSwipeLocked}
+                    commitStamp={commitStamp}
+                    onSwipeRight={() => void handleCardSwipe(card.id, "upvote")}
+                    onSwipeLeft={() => void handleCardSwipe(card.id, "downvote")}
+                    onCommentsClick={() => void openCommentsModal(card)}
+                  />
+                );
+              })}
+            </AnimatePresence>
+          </div>
         )}
+        {!isLoadingCards && pendingComplaints.length > 0 && !hasSwiped ? (
+          <p className="font-ledger text-xs text-slate-500 text-center animate-pulse mt-8">
+            {"< Swipe Left to Downvote • Swipe Right to Upvote >"}
+          </p>
+        ) : null}
       </div>
 
       <div aria-live="polite" className="mt-6 min-h-6 text-center text-lg">

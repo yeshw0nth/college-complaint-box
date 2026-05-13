@@ -1,12 +1,6 @@
 @import "tailwindcss";
 @config "../tailwind.config.ts";
 
-html {
-  overflow-x: hidden;
-  overscroll-behavior-x: none;
-  overscroll-behavior-y: none;
-}
-
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -27,9 +21,6 @@ html {
 body {
   background: var(--background);
   font-family: var(--font-special-elite), "Courier New", monospace;
-  overflow-x: hidden;
-  overscroll-behavior-x: none;
-  overscroll-behavior-y: none;
 }
 
 .stamp-upvote,

@@ -170,7 +170,7 @@ export function AdminView() {
 
   return (
     <div
-      className="flex min-h-0 flex-1 flex-col items-center justify-center bg-[#faf8f5] px-4 py-8 sm:py-12"
+      className="flex h-full min-h-0 w-full flex-1 flex-col items-center justify-start overflow-y-auto bg-[#faf8f5] px-4 pb-24 pt-8 sm:py-12"
       style={PAPER_TEXTURE_STYLE}
     >
       {session?.user ? (
@@ -262,7 +262,8 @@ export function AdminView() {
           )}
         </div>
       ) : (
-        <form className="flex w-full max-w-sm flex-col gap-6" onSubmit={handleLogin}>
+        <div className="flex w-full flex-1 flex-col items-center justify-center px-4 py-12">
+          <form className="flex w-full max-w-sm flex-col gap-6" onSubmit={handleLogin}>
           <h2 className="font-typewriter text-center text-sm font-semibold uppercase tracking-widest text-neutral-900">
             Admin sign in
           </h2>
@@ -315,7 +316,8 @@ export function AdminView() {
           >
             {message ? <p className="pt-1">{message}</p> : null}
           </div>
-        </form>
+          </form>
+        </div>
       )}
     </div>
   );
