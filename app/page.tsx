@@ -28,7 +28,7 @@ export default function Home() {
   const [isAdminView, setIsAdminView] = useState(false);
 
   return (
-    <div className="flex min-h-screen flex-col bg-neutral-50 text-neutral-900">
+    <div className="flex min-h-[100dvh] flex-col bg-neutral-50 text-neutral-900">
       <header className="flex shrink-0 items-center justify-between gap-4 border-b border-neutral-200 bg-white px-4 py-3 sm:px-6">
         <p className="text-base font-semibold tracking-tight text-neutral-900">
           Complaint box
@@ -51,7 +51,7 @@ export default function Home() {
         </button>
       </header>
 
-      <main className="flex flex-1 flex-col">
+      <main className="flex min-h-0 flex-1 flex-col">
         {isAdminView ? <AdminView /> : <StudentView />}
       </main>
     </div>

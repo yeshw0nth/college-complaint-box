@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
+import { triggerHaptic } from "@/lib/haptics";
 import { supabase } from "@/lib/supabase";
 
 type ComplaintStatus = "pending" | "reviewed";
@@ -23,7 +24,7 @@ const PAPER_TEXTURE_STYLE = {
 
 export function AdminView() {
   const sketchButtonClass =
-    "font-special-elite rounded-[255px_15px_225px_15px/15px_225px_15px_255px] border-2 border-black px-4 py-2 text-base font-semibold text-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-colors disabled:cursor-not-allowed disabled:opacity-60";
+    "font-typewriter rounded-[255px_15px_225px_15px/15px_225px_15px_255px] border-2 border-black px-4 py-2 text-sm font-semibold uppercase tracking-widest text-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-colors disabled:cursor-not-allowed disabled:opacity-60";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -58,37 +59,28 @@ export function AdminView() {
   }
 
   useEffect(() => {
-    const getCurrentSession = async () => {
-      const { data, error } = await supabase.auth.getSession();
+    void supabase.auth.getSession().then(({ error }) => {
       if (error) {
         setMessage(error.message);
-        return;
       }
-      setSession(data.session);
-    };
-
-    getCurrentSession();
+    });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
+      if (!nextSession) {
+        setComplaints([]);
+        setDashboardMessage("");
+        return;
+      }
+      void fetchComplaints();
     });
 
     return () => {
       subscription.unsubscribe();
     };
   }, []);
-
-  useEffect(() => {
-    if (!session?.user) {
-      setComplaints([]);
-      setDashboardMessage("");
-      return;
-    }
-
-    fetchComplaints();
-  }, [session]);
 
   async function handleLogin(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -131,6 +123,8 @@ export function AdminView() {
   async function handleMarkReviewed(id: number) {
     if (activeComplaintId !== null) return;
 
+    triggerHaptic(30);
+
     setActiveComplaintId(id);
     setDashboardMessage("");
 
@@ -157,6 +151,8 @@ export function AdminView() {
   async function handleDelete(id: number) {
     if (activeComplaintId !== null) return;
 
+    triggerHaptic(30);
+
     setActiveComplaintId(id);
     setDashboardMessage("");
 
@@ -174,17 +170,17 @@ export function AdminView() {
 
   return (
     <div
-      className="font-special-elite flex flex-1 flex-col items-center justify-center bg-[#faf8f5] px-4 py-8 sm:py-12"
+      className="flex min-h-0 flex-1 flex-col items-center justify-center bg-[#faf8f5] px-4 py-8 sm:py-12"
       style={PAPER_TEXTURE_STYLE}
     >
       {session?.user ? (
-        <div className="flex w-full max-w-5xl flex-col gap-6">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-[255px_15px_225px_15px/15px_225px_15px_255px] border-2 border-black bg-[#fff8b8] p-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
-            <div className="space-y-0.5">
-              <h2 className="font-special-elite text-lg font-medium text-neutral-900">
+        <div className="flex w-full max-w-5xl flex-col gap-8">
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-[255px_15px_225px_15px/15px_225px_15px_255px] border-2 border-black bg-[#fff8b8] p-5 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+            <div className="flex min-w-0 flex-col gap-2">
+              <h2 className="font-typewriter text-sm font-semibold uppercase tracking-widest text-neutral-900">
                 Admin dashboard
               </h2>
-              <p className="text-sm text-neutral-600">{session.user.email}</p>
+              <p className="font-ledger truncate text-xs text-slate-600">{session.user.email}</p>
             </div>
             <button
               type="button"
@@ -196,20 +192,20 @@ export function AdminView() {
             </button>
           </div>
 
-          <div aria-live="polite" className="min-h-5 text-sm text-neutral-600">
-            {message ? <p>{message}</p> : null}
+          <div aria-live="polite" className="min-h-5 font-ledger text-xs text-slate-600">
+            {message ? <p className="pt-1">{message}</p> : null}
           </div>
           <div
             aria-live="polite"
-            className={`min-h-5 text-sm ${dashboardMessage ? "text-rose-700" : "text-neutral-600"}`}
+            className={`min-h-5 font-ledger text-xs ${dashboardMessage ? "text-rose-700" : "text-slate-600"}`}
           >
-            {dashboardMessage ? <p>{dashboardMessage}</p> : null}
+            {dashboardMessage ? <p className="pt-1">{dashboardMessage}</p> : null}
           </div>
 
           {isComplaintsLoading ? (
-            <p className="text-sm text-neutral-600">Loading complaints...</p>
+            <p className="font-typewriter text-sm text-neutral-600">Loading complaints...</p>
           ) : complaints.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-6 text-sm text-neutral-600">
+            <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-6 font-typewriter text-sm text-neutral-600">
               No complaints found.
             </div>
           ) : (
@@ -223,28 +219,30 @@ export function AdminView() {
                 return (
                   <article
                     key={complaint.id}
-                    className={`mx-auto flex min-h-52 w-full max-w-md flex-col justify-between rounded-[255px_15px_225px_15px/15px_225px_15px_255px] border-2 border-black p-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] ${cardRotation}`}
+                    className={`mx-auto flex min-h-52 w-full max-w-md flex-col justify-between gap-5 rounded-[255px_15px_225px_15px/15px_225px_15px_255px] border-2 border-black p-5 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] ${cardRotation}`}
                     style={{ backgroundColor: STICKY_NOTE_COLOR }}
                   >
-                    <div className="space-y-2">
-                      <p className="font-kalam text-sm text-neutral-800">{complaint.content}</p>
-                      <div className="font-special-elite space-y-0.5 text-xs text-neutral-500">
+                    <div className="flex flex-col gap-4">
+                      <p className="font-ink text-2xl leading-relaxed text-neutral-800">
+                        {complaint.content}
+                      </p>
+                      <div className="flex flex-col gap-2 border-t border-dashed border-black/15 pt-3 font-ledger text-xs text-slate-600">
                         <p>{formatComplaintDate(complaint.created_at)}</p>
-                        <p className="font-medium capitalize">
+                        <p className="font-medium capitalize tracking-normal">
                           Status: {complaint.status}
                         </p>
-                        <p className="inline-block -rotate-1 rounded-[255px_15px_225px_15px/15px_225px_15px_255px] border-2 border-black bg-[#d9f99d] px-2 py-0.5 text-xs font-semibold text-neutral-900 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
+                        <p className="inline-block w-fit -rotate-1 rounded-[255px_15px_225px_15px/15px_225px_15px_255px] border-2 border-black bg-[#d9f99d] px-2 py-1 font-ledger text-xs text-slate-700 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
                           Upvotes: {complaint.upvotes ?? 0}
                         </p>
                       </div>
                     </div>
 
-                    <div className="mt-4 flex gap-2">
+                    <div className="flex flex-wrap gap-3">
                       <button
                         type="button"
                         onClick={() => handleMarkReviewed(complaint.id)}
                         disabled={isReviewed || isProcessing}
-                        className={`${sketchButtonClass} bg-[#f8f3e6] px-3 py-1.5 text-sm transition-all duration-150 hover:-translate-y-1 hover:bg-[#f3ebd8] hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]`}
+                        className={`${sketchButtonClass} bg-[#f8f3e6] px-3 py-2 transition-all duration-150 hover:-translate-y-1 hover:bg-[#f3ebd8] hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]`}
                       >
                         {isProcessing && !isReviewed ? "Updating..." : "Mark Reviewed"}
                       </button>
@@ -252,7 +250,7 @@ export function AdminView() {
                         type="button"
                         onClick={() => handleDelete(complaint.id)}
                         disabled={isProcessing}
-                        className={`${sketchButtonClass} bg-[#f8f3e6] px-3 py-1.5 text-sm text-rose-700 transition-all duration-150 hover:-translate-y-1 hover:bg-[#f3ebd8] hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]`}
+                        className={`${sketchButtonClass} bg-[#f8f3e6] px-3 py-2 text-rose-700 transition-all duration-150 hover:-translate-y-1 hover:bg-[#f3ebd8] hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]`}
                       >
                         {isProcessing ? "Deleting..." : "Delete"}
                       </button>
@@ -264,12 +262,15 @@ export function AdminView() {
           )}
         </div>
       ) : (
-        <form className="flex w-full max-w-sm flex-col gap-4" onSubmit={handleLogin}>
-          <h2 className="font-special-elite text-center text-lg font-medium text-neutral-900">
+        <form className="flex w-full max-w-sm flex-col gap-6" onSubmit={handleLogin}>
+          <h2 className="font-typewriter text-center text-sm font-semibold uppercase tracking-widest text-neutral-900">
             Admin sign in
           </h2>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="admin-email" className="font-special-elite text-sm text-neutral-600">
+          <div className="flex flex-col gap-2">
+            <label
+              htmlFor="admin-email"
+              className="font-typewriter text-sm font-semibold uppercase tracking-widest text-neutral-600"
+            >
               Email
             </label>
             <input
@@ -280,11 +281,14 @@ export function AdminView() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-base text-neutral-900 outline-none ring-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-neutral-400/30"
+              className="font-ledger w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xs text-slate-800 outline-none ring-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-neutral-400/30"
             />
           </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="admin-password" className="font-special-elite text-sm text-neutral-600">
+          <div className="flex flex-col gap-2">
+            <label
+              htmlFor="admin-password"
+              className="font-typewriter text-sm font-semibold uppercase tracking-widest text-neutral-600"
+            >
               Password
             </label>
             <input
@@ -295,7 +299,7 @@ export function AdminView() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-base text-neutral-900 outline-none ring-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-neutral-400/30"
+              className="font-ledger w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xs text-slate-800 outline-none ring-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-neutral-400/30"
             />
           </div>
           <button
@@ -307,9 +311,9 @@ export function AdminView() {
           </button>
           <div
             aria-live="polite"
-            className={`min-h-5 text-sm ${message ? "text-rose-700" : "text-neutral-600"}`}
+            className={`min-h-5 font-ledger text-xs ${message ? "text-rose-700" : "text-slate-600"}`}
           >
-            {message ? <p>{message}</p> : null}
+            {message ? <p className="pt-1">{message}</p> : null}
           </div>
         </form>
       )}
