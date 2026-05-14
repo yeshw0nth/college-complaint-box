@@ -1,5 +1,6 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
 import { FormEvent, useEffect, useRef, useState } from "react";
 import {
   AnimatePresence,
@@ -8,6 +9,16 @@ import {
   useMotionValue,
   useTransform,
 } from "framer-motion";
+import {
+  ImagePlus,
+  MessageCircle,
+  Plus,
+  RefreshCw,
+  Send,
+  ThumbsDown,
+  ThumbsUp,
+  X,
+} from "lucide-react";
 import { triggerHaptic } from "@/lib/haptics";
 import { supabase } from "@/lib/supabase";
 
@@ -36,6 +47,16 @@ const PAPER_TEXTURE_STYLE = {
 const CARD_ROTATIONS = ["rotate-1", "-rotate-1", "rotate-2", "-rotate-2"];
 const SWIPE_STORAGE_KEY = "swiped-complaint-ids";
 const SWIPE_DRAG_THRESHOLD = 100;
+const MAX_VISIBLE_CARDS = 4;
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
 
 function getStoredSwipeIds() {
   if (typeof window === "undefined") return new Set<number>();
@@ -54,6 +75,10 @@ function persistSwipeId(id: number) {
   const currentIds = getStoredSwipeIds();
   currentIds.add(id);
   localStorage.setItem(SWIPE_STORAGE_KEY, JSON.stringify(Array.from(currentIds)));
+}
+
+function clearStoredSwipeIds() {
+  localStorage.removeItem(SWIPE_STORAGE_KEY);
 }
 
 type SwipeableCardProps = {
@@ -209,7 +234,7 @@ function SwipeableCard({
 
       <div className="mt-2 flex flex-col gap-2 border-t border-dashed border-black/15 pt-3">
         <p className="font-ledger text-xs text-slate-600">
-          {new Date(complaint.created_at).toLocaleString()}
+          {formatDate(complaint.created_at)}
         </p>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-ledger text-xs text-slate-600">
           <span>Upvotes: {complaint.upvotes ?? 0}</span>
@@ -227,7 +252,10 @@ function SwipeableCard({
           }}
           className="font-typewriter rounded-[255px_15px_225px_15px/15px_225px_15px_255px] border-2 border-black bg-[#f8f3e6] px-3 py-2 text-sm font-semibold uppercase tracking-widest text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all duration-150 hover:-translate-y-0.5 hover:bg-[#f3ebd8]"
         >
-          💬 Comments
+          <span className="inline-flex items-center gap-2">
+            <MessageCircle className="size-4" aria-hidden />
+            Comments
+          </span>
         </button>
       </div>
       </motion.div>
@@ -257,30 +285,36 @@ export function StudentView() {
   const [errorMessage, setErrorMessage] = useState("");
   const [hasSwiped, setHasSwiped] = useState(false);
 
-  useEffect(() => {
-    async function fetchPendingComplaints() {
-      setIsLoadingCards(true);
-      setErrorMessage("");
+  async function fetchPendingComplaints({ includeSwiped = false } = {}) {
+    setIsLoadingCards(true);
+    setErrorMessage("");
 
-      const { data, error } = await supabase
-        .from("complaints")
-        .select("id, content, created_at, status, image_url, upvotes, downvotes")
-        .eq("status", "pending")
-        .order("created_at", { ascending: false });
+    const { data, error } = await supabase
+      .from("complaints")
+      .select("id, content, created_at, status, image_url, upvotes, downvotes")
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
 
-      if (error) {
-        setErrorMessage(error.message);
-      } else {
-        const swipedIds = getStoredSwipeIds();
-        const fetched = (data as Complaint[]) ?? [];
-        setPendingComplaints(fetched.filter((item) => !swipedIds.has(item.id)));
-      }
-
-      setIsLoadingCards(false);
+    if (error) {
+      setErrorMessage(error.message);
+    } else {
+      const swipedIds = includeSwiped ? new Set<number>() : getStoredSwipeIds();
+      const fetched = (data as Complaint[]) ?? [];
+      setPendingComplaints(fetched.filter((item) => !swipedIds.has(item.id)));
     }
 
-    fetchPendingComplaints();
+    setIsLoadingCards(false);
+  }
+
+  useEffect(() => {
+    void Promise.resolve().then(() => fetchPendingComplaints());
   }, []);
+
+  function handleResetDeck() {
+    clearStoredSwipeIds();
+    setHasSwiped(false);
+    void fetchPendingComplaints({ includeSwiped: true });
+  }
 
   async function handleCardSwipe(cardId: number, voteType: "upvote" | "downvote") {
     if (activeSwipeId !== null) return;
@@ -423,26 +457,68 @@ export function StudentView() {
     setIsSubmitting(false);
   }
 
-  const stackSize = pendingComplaints.length;
+  const visibleComplaints = pendingComplaints.slice(-MAX_VISIBLE_CARDS);
+  const stackSize = visibleComplaints.length;
   const isSwipeLocked = activeSwipeId !== null;
+  const topComplaint = pendingComplaints[pendingComplaints.length - 1];
+  const totalVotes = pendingComplaints.reduce(
+    (sum, item) => sum + (item.upvotes ?? 0) + (item.downvotes ?? 0),
+    0,
+  );
 
   return (
     <div
-      className="relative flex min-h-0 flex-1 flex-col items-center justify-center bg-[#faf8f5] px-4 py-8 sm:py-12"
+      className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden bg-[#faf8f5] px-4 py-8 sm:py-12"
       style={PAPER_TEXTURE_STYLE}
     >
-      <div className="relative w-full max-w-md pb-24">
+      <div className="mb-6 grid w-full max-w-3xl grid-cols-3 gap-2 font-ledger text-[11px] text-neutral-700 sm:gap-3">
+        <div className="rounded-md border-2 border-black bg-white/80 px-3 py-2 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
+          <p className="font-typewriter text-[10px] uppercase tracking-widest text-neutral-500">
+            In Deck
+          </p>
+          <p className="mt-1 text-lg font-semibold text-neutral-950">
+            {pendingComplaints.length}
+          </p>
+        </div>
+        <div className="rounded-md border-2 border-black bg-white/80 px-3 py-2 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
+          <p className="font-typewriter text-[10px] uppercase tracking-widest text-neutral-500">
+            Votes
+          </p>
+          <p className="mt-1 text-lg font-semibold text-neutral-950">{totalVotes}</p>
+        </div>
+        <button
+          type="button"
+          onClick={handleResetDeck}
+          className="inline-flex items-center justify-center gap-2 rounded-md border-2 border-black bg-[#f8f3e6] px-3 py-2 text-left font-semibold text-neutral-950 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-0.5 hover:bg-white"
+        >
+          <RefreshCw className="size-4" aria-hidden />
+          Reset
+        </button>
+      </div>
+
+      <div className="relative w-full max-w-md pb-28">
         {isLoadingCards ? (
-          <div style={{ minHeight: "26rem" }}>
+          <div
+            className="grid place-items-center rounded-md border-2 border-dashed border-black/30 bg-white/70"
+            style={{ minHeight: "26rem" }}
+          >
             <p className="font-typewriter text-center text-base text-neutral-700">
               Loading complaints...
             </p>
           </div>
         ) : pendingComplaints.length === 0 ? (
-          <div style={{ minHeight: "26rem" }}>
-            <p className="font-typewriter text-center text-base text-neutral-700">
-              No pending complaints.
-            </p>
+          <div
+            className="grid place-items-center rounded-[255px_15px_225px_15px/15px_225px_15px_255px] border-2 border-black bg-[#fff8b8] p-8 text-center shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]"
+            style={{ minHeight: "26rem" }}
+          >
+            <div>
+              <p className="font-typewriter text-base uppercase tracking-widest text-neutral-900">
+                All caught up
+              </p>
+              <p className="mt-3 font-ledger text-xs leading-5 text-neutral-600">
+                Submit a fresh complaint or reset the deck to revisit items you voted on.
+              </p>
+            </div>
           </div>
         ) : (
           <div
@@ -450,8 +526,8 @@ export function StudentView() {
             style={{ minHeight: "26rem" }}
           >
             <AnimatePresence>
-              {pendingComplaints.map((card, stackIndex) => {
-                const isTopCard = stackIndex === pendingComplaints.length - 1;
+              {visibleComplaints.map((card, stackIndex) => {
+                const isTopCard = card.id === topComplaint?.id;
                 const commitStamp =
                   stampVote && stampVote.complaintId === card.id ? stampVote.type : null;
 
@@ -473,10 +549,32 @@ export function StudentView() {
             </AnimatePresence>
           </div>
         )}
-        {!isLoadingCards && pendingComplaints.length > 0 && !hasSwiped ? (
-          <p className="font-ledger text-xs text-slate-500 text-center animate-pulse mt-8">
-            {"< Swipe Left to Downvote • Swipe Right to Upvote >"}
-          </p>
+        {!isLoadingCards && topComplaint ? (
+          <div className="mt-8 flex items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => void handleCardSwipe(topComplaint.id, "downvote")}
+              disabled={isSwipeLocked}
+              className="inline-flex size-12 items-center justify-center rounded-full border-2 border-black bg-rose-100 text-rose-700 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+              aria-label="Downvote complaint"
+            >
+              <ThumbsDown className="size-5" aria-hidden />
+            </button>
+            {!hasSwiped ? (
+              <p className="font-ledger animate-pulse text-center text-xs text-slate-500">
+                Swipe or tap to vote
+              </p>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => void handleCardSwipe(topComplaint.id, "upvote")}
+              disabled={isSwipeLocked}
+              className="inline-flex size-12 items-center justify-center rounded-full border-2 border-black bg-green-100 text-green-700 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+              aria-label="Upvote complaint"
+            >
+              <ThumbsUp className="size-5" aria-hidden />
+            </button>
+          </div>
         ) : null}
       </div>
 
@@ -497,8 +595,9 @@ export function StudentView() {
           >
             <label
               htmlFor="complaint"
-              className="font-typewriter text-sm font-semibold uppercase tracking-widest text-neutral-900"
+              className="flex items-center gap-2 font-typewriter text-sm font-semibold uppercase tracking-widest text-neutral-900"
             >
+              <Plus className="size-4" aria-hidden />
               New Complaint
             </label>
             <textarea
@@ -510,6 +609,13 @@ export function StudentView() {
               placeholder="Enter your complaint securely and anonymously..."
               className="font-ink min-h-44 w-full resize-y border-none border-b-2 border-dashed border-black/40 bg-transparent px-2 py-4 text-2xl leading-relaxed text-neutral-900 outline-none focus:ring-0"
             />
+            <div className="flex flex-wrap items-center justify-between gap-3 font-ledger text-[11px] text-slate-600">
+              <span>{complaint.trim().length} characters</span>
+              <span className="inline-flex items-center gap-1.5">
+                <ImagePlus className="size-3.5" aria-hidden />
+                {selectedImage ? selectedImage.name : "Optional image evidence"}
+              </span>
+            </div>
             <input
               type="file"
               accept="image/*"
@@ -522,14 +628,20 @@ export function StudentView() {
                 onClick={() => setIsFormOpen(false)}
                 className="font-typewriter rounded-[255px_15px_225px_15px/15px_225px_15px_255px] border-2 border-black bg-[#f8f3e6] px-4 py-2 text-sm font-semibold uppercase tracking-widest text-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-all duration-150 hover:-translate-y-1 hover:bg-[#f3ebd8] hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]"
               >
-                Cancel
+                <span className="inline-flex items-center gap-2">
+                  <X className="size-4" aria-hidden />
+                  Cancel
+                </span>
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
                 className="font-typewriter rounded-[255px_15px_225px_15px/15px_225px_15px_255px] border-2 border-black bg-[#f8f3e6] px-5 py-2 text-sm font-semibold uppercase tracking-widest text-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-all duration-150 hover:-translate-y-1 hover:bg-[#f3ebd8] hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isSubmitting ? "Submitting..." : "Submit Anonymously"}
+                <span className="inline-flex items-center gap-2">
+                  <Send className="size-4" aria-hidden />
+                  {isSubmitting ? "Submitting..." : "Submit Anonymously"}
+                </span>
               </button>
             </div>
           </form>
@@ -541,7 +653,10 @@ export function StudentView() {
           <div className="flex w-full max-w-xl flex-col gap-6 rounded-[255px_15px_225px_15px/15px_225px_15px_255px] border-2 border-black bg-[#fff8b8] p-5 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-typewriter text-sm font-semibold uppercase tracking-widest text-neutral-900">
-                Comments
+                <span className="inline-flex items-center gap-2">
+                  <MessageCircle className="size-4" aria-hidden />
+                  Comments
+                </span>
               </h3>
               <button
                 type="button"
@@ -553,7 +668,10 @@ export function StudentView() {
                 }}
                 className="font-typewriter rounded-[255px_15px_225px_15px/15px_225px_15px_255px] border-2 border-black bg-[#f8f3e6] px-3 py-2 text-sm font-semibold uppercase tracking-widest text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
               >
-                Close
+                <span className="inline-flex items-center gap-2">
+                  <X className="size-4" aria-hidden />
+                  Close
+                </span>
               </button>
             </div>
 
@@ -576,7 +694,7 @@ export function StudentView() {
                   >
                     <p className="font-ink text-2xl leading-relaxed text-neutral-800">{entry.content}</p>
                     <p className="font-ledger mt-2 text-xs text-slate-600">
-                      {new Date(entry.created_at).toLocaleString()}
+                      {formatDate(entry.created_at)}
                     </p>
                   </div>
                 ))
@@ -600,7 +718,10 @@ export function StudentView() {
                 disabled={isPostingComment}
                 className="font-typewriter shrink-0 rounded-[255px_15px_225px_15px/15px_225px_15px_255px] border-2 border-black bg-[#ffe066] px-4 py-2 text-sm font-semibold uppercase tracking-widest text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isPostingComment ? "Posting..." : "Post"}
+                <span className="inline-flex items-center gap-2">
+                  <Send className="size-4" aria-hidden />
+                  {isPostingComment ? "Posting..." : "Post"}
+                </span>
               </button>
             </div>
           </div>
@@ -617,7 +738,10 @@ export function StudentView() {
         }}
         className="font-typewriter fixed bottom-[max(1.25rem,env(safe-area-inset-bottom,0px))] left-1/2 z-[300] -translate-x-1/2 rounded-[255px_15px_225px_15px/15px_225px_15px_255px] border-2 border-black bg-[#ffe066] px-6 py-3 text-sm font-semibold uppercase tracking-widest text-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-colors hover:bg-[#ffd43b]"
       >
-        New Complaint
+        <span className="inline-flex items-center gap-2">
+          <Plus className="size-4" aria-hidden />
+          New Complaint
+        </span>
       </button>
     </div>
   );

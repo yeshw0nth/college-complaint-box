@@ -1,42 +1,29 @@
 "use client";
 
 import { useState } from "react";
+import { ShieldCheck, UserRound } from "lucide-react";
 import { AdminView } from "@/components/AdminView";
 import { StudentView } from "@/components/StudentView";
 
-function LockIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-      strokeWidth={1.5}
-      stroke="currentColor"
-      className={className}
-      aria-hidden
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
-      />
-    </svg>
-  );
-}
-
 export default function Home() {
   const [isAdminView, setIsAdminView] = useState(false);
+  const ToggleIcon = isAdminView ? UserRound : ShieldCheck;
 
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-neutral-50 text-neutral-900">
-      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-neutral-200 bg-white px-4 py-3 sm:px-6">
-        <p className="text-base font-semibold tracking-tight text-neutral-900">
-          Complaint box
-        </p>
+    <div className="flex min-h-[100dvh] flex-col bg-[#fbf7ef] text-neutral-900">
+      <header className="z-50 flex shrink-0 items-center justify-between gap-4 border-b-2 border-black bg-[#fff8b8] px-4 py-3 shadow-[0_4px_0px_0px_rgba(0,0,0,1)] sm:px-6">
+        <div className="min-w-0">
+          <p className="font-typewriter text-base font-semibold uppercase tracking-widest text-neutral-950">
+            Complaint Box
+          </p>
+          <p className="hidden font-ledger text-[11px] text-neutral-600 sm:block">
+            Anonymous campus feedback, triaged by staff.
+          </p>
+        </div>
         <button
           type="button"
           onClick={() => setIsAdminView((v) => !v)}
-          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-800"
+          className="inline-flex items-center gap-2 rounded-md border-2 border-black bg-[#f8f3e6] px-3 py-2 font-ledger text-xs font-semibold text-neutral-900 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-[5px_5px_0px_0px_rgba(0,0,0,1)]"
           aria-pressed={isAdminView}
           title={
             isAdminView
@@ -44,10 +31,8 @@ export default function Home() {
               : "Switch to admin sign-in"
           }
         >
-          <LockIcon className="size-4" />
-          <span className="hidden sm:inline">
-            {isAdminView ? "Student" : "Staff"}
-          </span>
+          <ToggleIcon className="size-4" aria-hidden />
+          <span>{isAdminView ? "Student" : "Staff"}</span>
         </button>
       </header>
 
